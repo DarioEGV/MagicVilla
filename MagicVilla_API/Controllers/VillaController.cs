@@ -2,6 +2,7 @@
 using MagicVilla_API.Datos;
 using MagicVilla_API.Modelos;
 using MagicVilla_API.Modelos.DTO;
+using MagicVilla_API.Repositorio.IRepositorio;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
@@ -15,12 +16,12 @@ namespace MagicVilla_API.Controllers
     public class VillaController : ControllerBase
     {
         private readonly ILogger<VillaController> _logger;
-        private readonly ApplicationDbContext _db;
+        private readonly IVillaRepositorio _villaRepo;
         private readonly IMapper _mapper;
-        public VillaController(ILogger<VillaController> logger,ApplicationDbContext db,IMapper mapper)
+        public VillaController(ILogger<VillaController> logger, IVillaRepositorio villaRepo, IMapper mapper)
         {
             _logger = logger;
-            _db = db;
+            _villaRepo = villaRepo;
             _mapper = mapper;
         }
 
@@ -30,7 +31,7 @@ namespace MagicVilla_API.Controllers
         public async Task< ActionResult<IEnumerable <VillaDTO>>> GetVillas()
         {
             _logger.LogInformation("Obtener la villas");
-            IEnumerable<Villa> villaList= await _db.Villas.ToListAsync();
+            IEnumerable<Villa> villaList= await _villaRepo.ObtenerTodos();
 
             return Ok(_mapper.Map<IEnumerable<VillaDTO>>(villaList));
         }
@@ -47,7 +48,7 @@ namespace MagicVilla_API.Controllers
                 return BadRequest();
             }
 
-               var villa =await _db.Villas.FirstOrDefaultAsync(v => v.Id == id);
+               var villa =await _villaRepo.Obtener(v => v.Id == id);
 
             if (villa==null)
             {
@@ -68,7 +69,7 @@ namespace MagicVilla_API.Controllers
             {
                 return BadRequest(ModelState);
             }
-            if (await _db.Villas.FirstOrDefaultAsync(V => V.Nombre.ToLower() == createDTO.Nombre.ToLower()) != null)
+            if (await _villaRepo.Obtener(V => V.Nombre.ToLower() == createDTO.Nombre.ToLower()) != null)
             {
                 ModelState.AddModelError("NombreExiste", "La Villa con este nombre ya existe!");
                 return BadRequest(ModelState);
@@ -80,8 +81,7 @@ namespace MagicVilla_API.Controllers
 
          Villa modelo=_mapper.Map<Villa>(createDTO);
 
-           await _db.Villas.AddAsync(modelo);
-           await _db.SaveChangesAsync();
+           await _villaRepo.Crear(modelo);
 
             return CreatedAtRoute("GetVilla",new {id= modelo.Id }, modelo);
         }
@@ -97,14 +97,14 @@ namespace MagicVilla_API.Controllers
                 return BadRequest();
             }
 
-            var villa =await _db.Villas.FirstOrDefaultAsync(v => v.Id == id);
+            var villa =await _villaRepo.Obtener(v => v.Id == id);
             if (villa == null)
             {
                 return NotFound();
             }
 
-           _db.Villas.Remove(villa);
-           await _db.SaveChangesAsync();
+            _villaRepo.Remover(villa);
+
 
             return NoContent();
         }
@@ -123,8 +123,7 @@ namespace MagicVilla_API.Controllers
             Villa modelo=_mapper.Map<Villa>(updateDTO);
 
 
-            _db.Villas.Update(modelo);
-           await _db.SaveChangesAsync();
+            _villaRepo.Actualizar(modelo);
 
             return NoContent();
         }
@@ -141,7 +140,7 @@ namespace MagicVilla_API.Controllers
             }
             // var villa = VillaStore.villaList.FirstOrDefault(v => v.Id == id);
 
-            var villa =await _db.Villas.AsNoTracking().FirstOrDefaultAsync(v => v.Id == id);
+            var villa =await _villaRepo.Obtener(v => v.Id == id,tracked:false);
 
             VillaUpdateDTO villaDTO= _mapper.Map<VillaUpdateDTO>(villa);
             
@@ -156,9 +155,8 @@ namespace MagicVilla_API.Controllers
             }
 
             Villa modelo = _mapper.Map<Villa>(villaDTO);
-          
-            _db.Villas.Update(modelo);
-          await  _db.SaveChangesAsync();
+
+            _villaRepo.Actualizar(modelo);
 
             return NoContent();
         }
